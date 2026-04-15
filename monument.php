@@ -37,8 +37,13 @@ include __DIR__ . '/includes/header.php';
 
     <span class="badge-found">✓ Monument trouvé !</span>
 
-    <?php if (!empty($monument['image'])): ?>
-        <img src="/assets/img/<?= htmlspecialchars($monument['image']) ?>"
+    <?php
+    $imgFile = !empty($monument['image'])
+        ? __DIR__ . '/assets/img/monuments/' . $monument['image']
+        : null;
+    ?>
+    <?php if ($imgFile && file_exists($imgFile)): ?>
+        <img src="/assets/img/monuments/<?= htmlspecialchars($monument['image']) ?>"
              alt="<?= htmlspecialchars($monument['name']) ?>"
              class="monument-img">
     <?php else: ?>

@@ -81,11 +81,16 @@ include __DIR__ . '/includes/header.php';
                 $found = in_array($m['id'], $foundIds);
             ?>
             <div class="monument-card <?= $found ? 'monument-found-card' : 'monument-hidden-card' ?>">
+                <?php
+                $hasImg  = !empty($m['image']) && file_exists(__DIR__ . '/assets/img/monuments/' . $m['image']);
+                $imgSrc  = $hasImg ? '/assets/img/monuments/' . htmlspecialchars($m['image']) : null;
+                ?>
                 <?php if ($found): ?>
                     <!-- Monument trouvé -->
                     <div class="card-img">
-                        <?php if (!empty($m['image'])): ?>
-                            <img src="/assets/img/<?= htmlspecialchars($m['image']) ?>" alt="<?= htmlspecialchars($m['name']) ?>" style="width:100%;height:160px;object-fit:cover">
+                        <?php if ($imgSrc): ?>
+                            <img src="<?= $imgSrc ?>" alt="<?= htmlspecialchars($m['name']) ?>"
+                                 style="width:100%;height:160px;object-fit:cover">
                         <?php else: ?>
                             🏛️
                         <?php endif; ?>
@@ -96,11 +101,18 @@ include __DIR__ . '/includes/header.php';
                         <span style="color:var(--success);font-size:.85rem;font-weight:600">✓ Trouvé !</span>
                     </div>
                 <?php else: ?>
-                    <!-- Monument non trouvé -->
-                    <div class="card-img card-img-hidden">❓</div>
+                    <!-- Monument non trouvé — photo floutée ou placeholder -->
+                    <div class="card-img card-img-hidden">
+                        <?php if ($imgSrc): ?>
+                            <img src="<?= $imgSrc ?>" alt="Monument mystère"
+                                 style="width:100%;height:160px;object-fit:cover;filter:blur(14px) brightness(.7);transform:scale(1.1)">
+                        <?php else: ?>
+                            ❓
+                        <?php endif; ?>
+                    </div>
                     <div class="card-body">
-                        <div class="country" style="color:var(--gray)">— — —</div>
-                        <div class="card-title" style="color:var(--gray);letter-spacing:.2em">? ? ? ? ?</div>
+                        <div class="country" style="color:var(--gray-300)">— — —</div>
+                        <div class="card-title" style="color:var(--gray-300);letter-spacing:.2em">? ? ? ? ?</div>
                         <?php if (!empty($m['hint'])): ?>
                             <button class="btn-hint" onclick="toggleHint(this)"
                                     data-hint="<?= htmlspecialchars($m['hint']) ?>">
