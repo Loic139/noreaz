@@ -11,18 +11,17 @@ $monument->execute([$monumentId]);
 $monument = $monument->fetch();
 if (!$monument) { header('Location: /admin/monuments.php'); exit; }
 
-$msg = '';
+$msg     = '';
+$editQ   = null; // question en cours d'édition
 
-// Ajout d'une question
+// Ajout
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'add') {
-    $q  = trim($_POST['question']  ?? '');
-    $c  = trim($_POST['correct']   ?? '');
-    $w1 = trim($_POST['wrong1']    ?? '');
-    $w2 = trim($_POST['wrong2']    ?? '');
-    $w3 = trim($_POST['wrong3']    ?? '');
+    $q  = trim($_POST['question'] ?? '');
+    $c  = trim($_POST['correct']  ?? '');
+    $w1 = trim($_POST['wrong1']   ?? '');
+    $w2 = trim($_POST['wrong2']   ?? '');
+    $w3 = trim($_POST['wrong3']   ?? '');
     if ($q && $c && $w1 && $w2 && $w3) {
-        $order = (int) pdo()->prepare('SELECT COUNT(*) FROM questions WHERE monument_id=?')
-                            ->execute([$monumentId]) ? 0 : 0;
         $cnt = pdo()->prepare('SELECT COUNT(*) FROM questions WHERE monument_id=?');
         $cnt->execute([$monumentId]);
         $order = (int)$cnt->fetchColumn() + 1;
@@ -34,12 +33,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'add')
     }
 }
 
+// Modification
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'edit') {
+    $id = (int)($_POST['question_id'] ?? 0);
+    $q  = trim($_POST['question'] ?? '');
+    $c  = trim($_POST['correct']  ?? '');
+    $w1 = trim($_POST['wrong1']   ?? '');
+    $w2 = trim($_POST['wrong2']   ?? '');
+    $w3 = trim($_POST['wrong3']   ?? '');
+    if ($id && $q && $c && $w1 && $w2 && $w3) {
+        pdo()->prepare(
+            'UPDATE questions SET question_text=?, answer_correct=?, answer_wrong1=?, answer_wrong2=?, answer_wrong3=?
+             WHERE id=? AND monument_id=?'
+        )->execute([$q, $c, $w1, $w2, $w3, $id, $monumentId]);
+        $msg = 'Question modifiée.';
+    }
+}
+
 // Suppression
 if (isset($_GET['delete'])) {
     pdo()->prepare('DELETE FROM questions WHERE id=? AND monument_id=?')
          ->execute([(int)$_GET['delete'], $monumentId]);
     header('Location: /admin/questions.php?monument_id=' . $monumentId);
     exit;
+}
+
+// Chargement du formulaire d'édition
+if (isset($_GET['edit'])) {
+    $s = pdo()->prepare('SELECT * FROM questions WHERE id=? AND monument_id=?');
+    $s->execute([(int)$_GET['edit'], $monumentId]);
+    $editQ = $s->fetch();
 }
 
 $questions = pdo()->prepare('SELECT * FROM questions WHERE monument_id=? ORDER BY sort_order');
@@ -52,7 +75,7 @@ $questions = $questions->fetchAll();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin — Questions</title>
-    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600&family=Open+Sans&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/assets/css/style.css">
 </head>
 <body>
@@ -74,13 +97,51 @@ $questions = $questions->fetchAll();
 
     <div class="section-header">
         <h2>Questions — <?= htmlspecialchars($monument['name']) ?></h2>
-        <a href="/admin/monuments.php" class="btn btn-outline" style="color:var(--black);border-color:var(--black)">← Retour</a>
+        <a href="/admin/monuments.php" class="btn btn-dark">← Retour</a>
     </div>
 
-    <?php if (count($questions) >= QUIZ_QUESTIONS): ?>
-        <div class="alert alert-info">Ce monument a atteint le maximum de <?= QUIZ_QUESTIONS ?> questions.</div>
-    <?php else: ?>
-    <!-- Formulaire d'ajout -->
+    <!-- Formulaire ajout / édition -->
+    <?php if ($editQ): ?>
+    <!-- MODE ÉDITION -->
+    <div class="card" style="margin-bottom:1.5rem;border:2px solid var(--red)">
+        <div class="card-body">
+            <h3 style="margin-bottom:1rem;color:var(--red)">✏️ Modifier la question</h3>
+            <form method="post" action="/admin/questions.php?monument_id=<?= $monumentId ?>">
+                <input type="hidden" name="action" value="edit">
+                <input type="hidden" name="question_id" value="<?= $editQ['id'] ?>">
+                <div class="form-group">
+                    <label>Question *</label>
+                    <input type="text" name="question" required value="<?= htmlspecialchars($editQ['question_text']) ?>">
+                </div>
+                <div class="form-group">
+                    <label>Bonne réponse *</label>
+                    <input type="text" name="correct" required value="<?= htmlspecialchars($editQ['answer_correct']) ?>">
+                </div>
+                <div class="grid-3" style="gap:.75rem">
+                    <div class="form-group" style="margin:0">
+                        <label>Mauvaise réponse 1 *</label>
+                        <input type="text" name="wrong1" required value="<?= htmlspecialchars($editQ['answer_wrong1']) ?>">
+                    </div>
+                    <div class="form-group" style="margin:0">
+                        <label>Mauvaise réponse 2 *</label>
+                        <input type="text" name="wrong2" required value="<?= htmlspecialchars($editQ['answer_wrong2']) ?>">
+                    </div>
+                    <div class="form-group" style="margin:0">
+                        <label>Mauvaise réponse 3 *</label>
+                        <input type="text" name="wrong3" required value="<?= htmlspecialchars($editQ['answer_wrong3']) ?>">
+                    </div>
+                </div>
+                <br>
+                <div style="display:flex;gap:.75rem">
+                    <button type="submit" class="btn btn-primary">💾 Enregistrer</button>
+                    <a href="/admin/questions.php?monument_id=<?= $monumentId ?>" class="btn btn-dark">Annuler</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <?php elseif (count($questions) < QUIZ_QUESTIONS): ?>
+    <!-- MODE AJOUT -->
     <div class="card" style="margin-bottom:1.5rem">
         <div class="card-body">
             <h3 style="margin-bottom:1rem">Ajouter une question</h3>
@@ -113,6 +174,8 @@ $questions = $questions->fetchAll();
             </form>
         </div>
     </div>
+    <?php else: ?>
+        <div class="alert alert-info">Ce monument a atteint le maximum de <?= QUIZ_QUESTIONS ?> questions.</div>
     <?php endif; ?>
 
     <!-- Liste des questions -->
@@ -125,7 +188,7 @@ $questions = $questions->fetchAll();
         </thead>
         <tbody>
         <?php foreach ($questions as $i => $q): ?>
-            <tr>
+            <tr <?= $editQ && $editQ['id'] === $q['id'] ? 'style="background:#fff8f8"' : '' ?>>
                 <td><?= $i+1 ?></td>
                 <td><?= htmlspecialchars($q['question_text']) ?></td>
                 <td style="color:var(--success);font-weight:600"><?= htmlspecialchars($q['answer_correct']) ?></td>
@@ -134,10 +197,16 @@ $questions = $questions->fetchAll();
                     <?= htmlspecialchars($q['answer_wrong2']) ?>,
                     <?= htmlspecialchars($q['answer_wrong3']) ?>
                 </td>
-                <td>
+                <td style="display:flex;gap:.4rem;flex-wrap:wrap">
+                    <a href="/admin/questions.php?monument_id=<?= $monumentId ?>&edit=<?= $q['id'] ?>"
+                       class="btn btn-ghost" style="font-size:.8rem;padding:.3rem .7rem">
+                        ✏️ Modifier
+                    </a>
                     <a href="/admin/questions.php?monument_id=<?= $monumentId ?>&delete=<?= $q['id'] ?>"
                        class="btn" style="background:var(--danger);color:white;font-size:.8rem;padding:.3rem .7rem"
-                       onclick="return confirm('Supprimer cette question ?')">Supprimer</a>
+                       onclick="return confirm('Supprimer cette question ?')">
+                        Supprimer
+                    </a>
                 </td>
             </tr>
         <?php endforeach; ?>
